@@ -1,0 +1,41 @@
+# Copy this file to .env and fill in your values.
+# Never commit the real .env to git.
+
+# --- Telegram ---
+# 1. Message @BotFather on Telegram, /newbot, copy the token below.
+# 2. Add the bot to your channel/group (or DM it), then get your chat id:
+#    send it any message, then open:
+#    https://api.telegram.org/bot<TOKEN>/getUpdates
+#    and read "chat":{"id": ...} from the response.
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+
+# --- Jupiter API ---
+# Leave JUPITER_API_KEY empty to use the free tier (lite-api.jup.ag, lower
+# rate limit). Get a key at https://developers.jup.ag/portal for the paid
+# tier (api.jup.ag, higher rate limit) if you outgrow the free tier or
+# want to shorten CHECK_INTERVAL_SEC below 60s.
+JUPITER_API_KEY=
+# JUPITER_BASE_URL=
+
+# Verify these against {base_url}/program-id-to-label before relying on
+# them — Jupiter occasionally renames DEX labels.
+RAYDIUM_LABELS=Raydium,Raydium CLMM,Raydium CPMM
+ORCA_LABELS=Orca V2,Whirlpool
+
+# --- Trade / cost model ---
+TRADE_SIZE_USD=1000
+SLIPPAGE_BPS=50
+BASE_FEE_SOL_PER_TX=0.000005
+PRIORITY_FEE_SOL_PER_TX=0.0003
+
+# --- Scheduling ---
+CHECK_INTERVAL_SEC=60
+REPORT_INTERVAL_SEC=3600
+
+# Optional instant alert on top of the hourly report. Leave unset to disable.
+# ALERT_THRESHOLD_USD=2.0
+
+# --- Misc ---
+DB_PATH=arb_monitor.db
+LOG_PATH=arb_monitor.log
