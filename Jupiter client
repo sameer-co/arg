@@ -1,0 +1,124 @@
+"""
+Minimal client for Jupiter's Swap API /quote endpoint.
+
+Docs: https://dev.jup.ag/api-reference/swap/quote
+Free tier base: https://lite-api.jup.ag/swap/v1
+Paid tier base: https://api.jup.ag/swap/v1  (header x-api-key)
+
+We restrict routing to a single DEX at a time via the `dexes` query param
+to get that DEX's standalone price, instead of Jupiter's full aggregate.
+"""
+import logging
+import random
+import time
+
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+import config
+
+log = logging.getLogger("jupiter_client")
+
+
+class JupiterError(RuntimeError):
+    pass
+
+
+class JupiterClient:
+    def __init__(self, test_mode: bool = False):
+        self.test_mode = test_mode
+        self.session = requests.Session()
+        retries = Retry(
+            total=config.HTTP_MAX_RETRIES,
+            backoff_factor=0.5,
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=("GET",),
+        )
+        self.session.mount("https://", HTTPAdapter(max_retries=retries))
+        self.headers = {"x-api-key": config.JUPITER_API_KEY} if config.JUPITER_API_KEY else {}
+
+    # ------------------------------------------------------------------
+    def quote(self, input_mint: str, output_mint: str, amount: int,
+              dexes: list[str] | None = None, slippage_bps: int = config.SLIPPAGE_BPS) -> dict:
+        """
+        Returns the raw Jupiter quote dict. Raises JupiterError on failure.
+        `amount` is in the input token's base units (lamports / smallest unit).
+        `dexes`, if given, restricts routing to only those DEX labels.
+        """
+        if self.test_mode:
+            return self._mock_quote(input_mint, output_mint, amount, dexes)
+
+        params = {
+            "inputMint": input_mint,
+            "outputMint": output_mint,
+            "amount": str(amount),
+            "slippageBps": slippage_bps,
+            "restrictIntermediateTokens": "true",
+        }
+        if dexes:
+            params["dexes"] = ",".join(dexes)
+
+        url = f"{config.JUPITER_BASE_URL}/quote"
+        try:
+            resp = self.session.get(url, params=params, headers=self.headers,
+                                     timeout=config.HTTP_TIMEOUT_SEC)
+        except requests.RequestException as exc:
+            raise JupiterError(f"network error calling Jupiter: {exc}") from exc
+
+        if resp.status_code != 200:
+            raise JupiterError(f"Jupiter returned {resp.status_code}: {resp.text[:300]}")
+
+        data = resp.json()
+        if "outAmount" not in data:
+            raise JupiterError(f"unexpected Jupiter response: {data}")
+        return data
+
+    def fetch_dex_labels(self) -> dict:
+        """Fetch the current program-id -> label mapping, for validating config."""
+        if self.test_mode:
+            return {}
+        url = f"{config.JUPITER_BASE_URL}/program-id-to-label"
+        try:
+            resp = self.session.get(url, headers=self.headers, timeout=config.HTTP_TIMEOUT_SEC)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException as exc:
+            log.warning("could not fetch program-id-to-label: %s", exc)
+            return {}
+
+    # ------------------------------------------------------------------
+    # Synthetic quotes for --self-test: no network calls, but realistic
+    # shape and a randomized small spread between Raydium/Orca so the
+    # profit-calc / DB / Telegram-formatting code can be exercised.
+    # ------------------------------------------------------------------
+    def _mock_quote(self, input_mint, output_mint, amount, dexes):
+        base_sol_price = 195.0  # USD, arbitrary reference for the mock
+        venue_bias = 0.0
+        if dexes:
+            label = dexes[0]
+            # deterministic-ish per-run jitter so two calls to the same venue
+            # in one cycle are consistent, but different venues can differ
+            seed = hash((label, int(time.time() // config.CHECK_INTERVAL_SEC)))
+            rng = random.Random(seed)
+            venue_bias = rng.uniform(-0.0015, 0.0015)  # up to +/-0.15%
+
+        price = base_sol_price * (1 + venue_bias)
+
+        if input_mint == config.USDC_MINT:
+            in_amt_usdc = amount / 10 ** config.USDC_DECIMALS
+            out_sol = in_amt_usdc / price
+            out_amount = int(out_sol * 10 ** config.SOL_DECIMALS)
+        else:
+            in_amt_sol = amount / 10 ** config.SOL_DECIMALS
+            out_usdc = in_amt_sol * price
+            out_amount = int(out_usdc * 10 ** config.USDC_DECIMALS)
+
+        return {
+            "inputMint": input_mint,
+            "outputMint": output_mint,
+            "inAmount": str(amount),
+            "outAmount": str(out_amount),
+            "priceImpactPct": "0.0002",
+            "routePlan": [{"swapInfo": {"label": (dexes[0] if dexes else "Jupiter-Agg")}}],
+        }
