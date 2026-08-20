@@ -30,8 +30,8 @@ def _get_int(name: str, default: int) -> int:
 # ---------------------------------------------------------------------------
 # Telegram
 # ---------------------------------------------------------------------------
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8392707199:AAHjWHGLoZ3Udm4rS5JlgSaPLez1qZbHMOo")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1950462171")
 
 # ---------------------------------------------------------------------------
 # Jupiter API
@@ -39,7 +39,7 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 # Free tier (no key, lower rate limit): https://lite-api.jup.ag/swap/v1
 # Paid tier (x-api-key header, higher rate limit): https://api.jup.ag/swap/v1
 # Get a key at https://developers.jup.ag/portal if you outgrow the free tier.
-JUPITER_API_KEY = os.getenv("JUPITER_API_KEY", "")
+JUPITER_API_KEY = os.getenv("JUPITER_API_KEY", "jup_10a327fad4d6cb54a9492275abd649b906809916eff59b217aea5a1d7121ec55")
 JUPITER_BASE_URL = os.getenv(
     "JUPITER_BASE_URL",
     "https://api.jup.ag/swap/v1" if JUPITER_API_KEY else "https://lite-api.jup.ag/swap/v1",
@@ -59,8 +59,8 @@ USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 SOL_DECIMALS = 9
 USDC_DECIMALS = 6
 
-TRADE_SIZE_USD = _get_float("TRADE_SIZE_USD", 1000.0)
-SLIPPAGE_BPS = _get_int("SLIPPAGE_BPS", 50)  # 0.50%
+TRADE_SIZE_USD = _get_float("TRADE_SIZE_USD", 100.0)
+SLIPPAGE_BPS = _get_int("SLIPPAGE_BPS", 50)  # 0.01%
 
 # ---------------------------------------------------------------------------
 # Cost model (Solana network side)
