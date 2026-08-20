@@ -1,0 +1,90 @@
+"""
+Configuration for the SOL/USDC Jupiter <-> Raydium/Orca arbitrage monitor.
+
+Everything here can be overridden with environment variables (or a .env
+file next to this script). Nothing sensitive is hard-coded.
+"""
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # loads .env if present; real env vars always win
+
+
+def _get_bool(name: str, default: bool) -> bool:
+    val = os.getenv(name)
+    if val is None:
+        return default
+    return val.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _get_float(name: str, default: float) -> float:
+    val = os.getenv(name)
+    return float(val) if val not in (None, "") else default
+
+
+def _get_int(name: str, default: int) -> int:
+    val = os.getenv(name)
+    return int(val) if val not in (None, "") else default
+
+
+# ---------------------------------------------------------------------------
+# Telegram
+# ---------------------------------------------------------------------------
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+
+# ---------------------------------------------------------------------------
+# Jupiter API
+# ---------------------------------------------------------------------------
+# Free tier (no key, lower rate limit): https://lite-api.jup.ag/swap/v1
+# Paid tier (x-api-key header, higher rate limit): https://api.jup.ag/swap/v1
+# Get a key at https://developers.jup.ag/portal if you outgrow the free tier.
+JUPITER_API_KEY = os.getenv("JUPITER_API_KEY", "")
+JUPITER_BASE_URL = os.getenv(
+    "JUPITER_BASE_URL",
+    "https://api.jup.ag/swap/v1" if JUPITER_API_KEY else "https://lite-api.jup.ag/swap/v1",
+)
+
+# Exact DEX labels as Jupiter's routing engine reports them. Verify these
+# for yourself against {JUPITER_BASE_URL}/program-id-to-label — Jupiter
+# occasionally renames labels (e.g. "Orca V2" vs "Whirlpool").
+RAYDIUM_LABELS = [s.strip() for s in os.getenv("RAYDIUM_LABELS", "Raydium,Raydium CLMM,Raydium CPMM").split(",")]
+ORCA_LABELS = [s.strip() for s in os.getenv("ORCA_LABELS", "Orca V2,Whirlpool").split(",")]
+
+# ---------------------------------------------------------------------------
+# Market / trade parameters
+# ---------------------------------------------------------------------------
+SOL_MINT = "So11111111111111111111111111111111111111112"
+USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+SOL_DECIMALS = 9
+USDC_DECIMALS = 6
+
+TRADE_SIZE_USD = _get_float("TRADE_SIZE_USD", 1000.0)
+SLIPPAGE_BPS = _get_int("SLIPPAGE_BPS", 50)  # 0.50%
+
+# ---------------------------------------------------------------------------
+# Cost model (Solana network side)
+# ---------------------------------------------------------------------------
+BASE_FEE_SOL_PER_TX = _get_float("BASE_FEE_SOL_PER_TX", 0.000005)          # 5000 lamports, fixed protocol fee
+PRIORITY_FEE_SOL_PER_TX = _get_float("PRIORITY_FEE_SOL_PER_TX", 0.0003)    # buffer for priority fee / tip
+TXS_PER_ARB = 2  # buy leg + sell leg, executed sequentially (not atomic — see README)
+
+# ---------------------------------------------------------------------------
+# Scheduling
+# ---------------------------------------------------------------------------
+CHECK_INTERVAL_SEC = _get_int("CHECK_INTERVAL_SEC", 60)
+REPORT_INTERVAL_SEC = _get_int("REPORT_INTERVAL_SEC", 3600)
+
+# Optional: fire an immediate Telegram alert the moment net edge crosses this
+# threshold, in addition to the hourly report. Set to empty/unset to disable.
+ALERT_THRESHOLD_USD = os.getenv("ALERT_THRESHOLD_USD", "")
+ALERT_ENABLED = ALERT_THRESHOLD_USD not in (None, "")
+ALERT_THRESHOLD_USD = float(ALERT_THRESHOLD_USD) if ALERT_ENABLED else None
+
+# ---------------------------------------------------------------------------
+# Misc
+# ---------------------------------------------------------------------------
+DB_PATH = os.getenv("DB_PATH", "arb_monitor.db")
+LOG_PATH = os.getenv("LOG_PATH", "arb_monitor.log")
+HTTP_TIMEOUT_SEC = _get_int("HTTP_TIMEOUT_SEC", 10)
+HTTP_MAX_RETRIES = _get_int("HTTP_MAX_RETRIES", 3)
